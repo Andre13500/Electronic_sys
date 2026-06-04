@@ -1,0 +1,37 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  font-family: 'Inter', system-ui, sans-serif;
+  background: #fafaf7;
+  color: #2b2b2b;
+  -webkit-font-smoothing: antialiased;
+}
+
+@layer components {
+  .btn { @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg
+                font-medium text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed; }
+  .btn-primary   { @apply btn bg-brand-600 text-white hover:bg-brand-700; }
+  .btn-secondary { @apply btn bg-white text-warm-ink border border-warm-line hover:bg-warm-bg; }
+  .btn-ghost     { @apply btn text-warm-mute hover:bg-warm-bg; }
+
+  .input {
+    @apply w-full px-3.5 py-2.5 border border-warm-line rounded-lg text-sm bg-white
+           placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-200
+           focus:border-brand-400 transition;
+  }
+  .label  { @apply block text-xs font-medium text-warm-mute mb-1.5; }
+  .card   { @apply bg-warm-card rounded-xl border border-warm-line shadow-soft; }
+
+  .badge { @apply inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium; }
+  .badge-borrador   { @apply badge bg-amber-50  text-amber-700; }
+  .badge-finalizado { @apply badge bg-emerald-50 text-emerald-700; }
+}
+
+button { -webkit-tap-highlight-color: transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: #d8d8d4; border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background: #b8b8b3; }

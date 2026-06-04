@@ -1,0 +1,14 @@
+{
+  "ExpandedNodes": [
+    "",
+    "\\InformesTecnicos.Api",
+    "\\InformesTecnicos.Api\\Data",
+    "\\InformesTecnicos.Api\\Migrations",
+    "\\InformesTecnicos.Api\\Models",
+    "\\InformesTecnicos.Api\\Properties",
+    "\\InformesTecnicos.Api\\Services",
+    "\\InformesTecnicos.Api\\Templates"
+  ],
+  "SelectedNode": "\\InformesTecnicos.Api\\Services\\AuthService.cs",
+  "PreviewInSolutionExplorer": false
+}
