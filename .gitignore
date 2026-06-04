@@ -15,3 +15,32 @@ backend/InformesTecnicos.Api/uploads/
 # Variables de entorno locales
 .env
 .env.local
+
+# Visual Studio / Rider workspace temp files
+.vs/
+backend/.vs/
+*.user
+*.suo
+.idea/
+
+# Ejecutables e instaladores (nunca al repo)
+*.exe
+*.msi
+*.dmg
+*.pkg
+*.deb
+*.rpm
+*.appimage
+
+# Frontend build output
+frontend/dist/
+frontend/.vite/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+npm-debug.log*
