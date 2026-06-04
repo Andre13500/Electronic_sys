@@ -1,0 +1,83 @@
+# =============================================================================
+# RENDER.YAML — Configuración de despliegue en Render.com
+#
+# ¿Qué hace este archivo?
+#   Define la infraestructura de la app en Render como código (Infrastructure
+#   as Code). Al conectar tu repositorio en render.com, Render lee este archivo
+#   y crea automáticamente los servicios y discos configurados aquí.
+#
+# Cómo usarlo:
+#   1. Sube este repositorio a GitHub (o GitLab).
+#   2. En render.com → New → Blueprint → conecta tu repo.
+#   3. Render detecta render.yaml y crea todo automáticamente.
+#   4. Después del primer deploy, ve a las variables de entorno del servicio
+#      en el dashboard y verifica que Jwt__Key tenga un valor seguro.
+#
+# ┌─ PLAN FREE vs PAGO ───────────────────────────────────────────────────────┐
+# │  La sección "disk" requiere un plan de pago (~$7/mes para el disco).      │
+# │  Sin disco, la BD SQLite y las fotos se pierden al redesplegar.           │
+# │  Para solo probar la app, comenta o elimina la sección "disk" y           │
+# │  cambia ConnectionStrings__Default a: Data Source=informes.db             │
+# └────────────────────────────────────────────────────────────────────────────┘
+# =============================================================================
+
+services:
+  - type: web
+    name: informes-tecnicos-lg
+
+    # ── Fuente de la imagen ───────────────────────────────────────────────────
+    # Render construye la imagen Docker desde el repositorio usando el Dockerfile
+    # en la raíz del proyecto.
+    runtime: docker
+    dockerfilePath: ./Dockerfile    # Ruta al Dockerfile desde la raíz del repo
+    dockerContext: .                # Contexto de build (raíz del repo)
+
+    # ── Plan de Render ────────────────────────────────────────────────────────
+    # "free" = gratis pero duerme tras 15 min de inactividad.
+    # "starter" = ~$7/mes, siempre activo, permite usar disco persistente.
+    plan: free
+
+    # ── Puerto que Render enrutará al contenedor ──────────────────────────────
+    # Debe coincidir con el puerto configurado en nginx.conf (listen 10000).
+    healthCheckPath: /              # Render pingea esta ruta para saber si el servicio está vivo
+
+    # ── Variables de entorno ──────────────────────────────────────────────────
+    # Las variables con doble guion bajo (__) son separadores de sección en .NET.
+    # Ej: Jwt__Key  →  cfg["Jwt:Key"]
+    envVars:
+      # Modo de ejecución .NET → carga appsettings.Production.json automáticamente
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+
+      # Puerto en que escucha el backend .NET (interno, solo accesible desde nginx)
+      - key: ASPNETCORE_URLS
+        value: http://+:5000
+
+      # ── JWT ──────────────────────────────────────────────────────────────────
+      # generateValue: true → Render genera una cadena aleatoria segura al crear
+      # el servicio. Una vez generada, nunca cambia (a menos que la borres).
+      - key: Jwt__Key
+        generateValue: true         # ← Render genera una clave segura automáticamente
+
+      - key: Jwt__Issuer
+        value: InformesTecnicos
+
+      - key: Jwt__Audience
+        value: InformesTecnicos.Clients
+
+      # ── Base de datos ─────────────────────────────────────────────────────────
+      # La BD vive en el disco persistente de Render (/data).
+      # CAMBIA ESTO a "Data Source=informes.db" si estás en plan free sin disco.
+      - key: ConnectionStrings__Default
+        value: Data Source=/data/informes.db
+
+      - key: Database__Provider
+        value: Sqlite
+
+    # ── Disco persistente (requiere plan Starter o superior, ~$7/mes) ─────────
+    # Sin esto, la base de datos y las fotos se pierden en cada redeploy.
+    # Para plan free: comenta estas 4 líneas.
+    disk:
+      name: informes-datos          # Nombre del disco en el dashboard de Render
+      mountPath: /data              # Directorio donde Render monta el disco en el contenedor
+      sizeGB: 1                     # Tamaño del disco (1 GB es más que suficiente)
