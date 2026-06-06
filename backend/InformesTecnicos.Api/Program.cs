@@ -149,11 +149,8 @@ app.Use(async (ctx, next) =>
 if (!app.Environment.IsDevelopment())
     app.UseHttpsRedirection();
 
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+app.UseSwagger();
+app.UseSwaggerUI();
 
 app.UseCors("Front");
 app.UseRateLimiter();
