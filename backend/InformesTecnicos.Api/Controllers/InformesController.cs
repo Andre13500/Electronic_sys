@@ -54,11 +54,29 @@ public class InformesController : ControllerBase
         catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
     }
 
+    private static readonly HashSet<string> _mimePermitidos = ["image/jpeg", "image/png", "image/webp"];
+    private static readonly byte[][] _firmasImagenes =
+    [
+        [0xFF, 0xD8, 0xFF],           // JPEG
+        [0x89, 0x50, 0x4E, 0x47],    // PNG
+        [0x52, 0x49, 0x46, 0x46],    // WEBP (RIFF)
+    ];
+
+    private static bool EsImagenValida(IFormFile archivo)
+    {
+        if (!_mimePermitidos.Contains(archivo.ContentType.ToLowerInvariant())) return false;
+        using var ms = new MemoryStream();
+        archivo.OpenReadStream().CopyTo(ms);
+        var header = ms.ToArray().Take(8).ToArray();
+        return _firmasImagenes.Any(firma => header.Take(firma.Length).SequenceEqual(firma));
+    }
+
     [HttpPost("{id:int}/fotos")]
     [RequestSizeLimit(50_000_000)]
     public async Task<IActionResult> SubirFoto(int id, [FromForm] string slot, IFormFile archivo)
     {
         if (archivo is null || archivo.Length == 0) return BadRequest(new { error = "Archivo requerido" });
+        if (!EsImagenValida(archivo)) return BadRequest(new { error = "Solo se permiten imágenes JPG, PNG o WEBP" });
         try { return Ok(await _svc.SubirFotoAsync(id, slot, archivo, _env)); }
         catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
     }

@@ -15,7 +15,6 @@
     "react-router-dom": "^6.22.0"
   },
   "devDependencies": {
-    "@angular/cli": "^21.2.13",
     "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.17",
     "postcss": "^8.4.35",

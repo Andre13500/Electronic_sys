@@ -10,4 +10,18 @@ export default defineConfig({
       '/uploads': { target: 'http://localhost:5000', changeOrigin: true },
     },
   },
+  build: {
+    target: 'es2015',
+    minify: 'esbuild',
+    sourcemap: false,
+    chunkSizeWarningLimit: 600,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-http':  ['axios'],
+        },
+      },
+    },
+  },
 })
