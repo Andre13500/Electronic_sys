@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { informesApi } from '../services/api'
+import { useModulos } from '../services/modulos'
+import { useToast } from '../components/Toast.jsx'
+import AuthImage from '../components/AuthImage.jsx'
 
 const fmtFecha = (d) => new Date(d).toLocaleDateString('es-EC', {
   day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit'
@@ -13,50 +16,44 @@ const FORMA_PAGO_LABEL = {
   free: 'Gratuito (Free)',
 }
 
-// Etiqueta de tipo de servicio
-const TIPO_SERVICIO_LABEL = {
-  washtower: 'WashTower',
-  refrigerador: 'Refrigeradora',
-}
-
-// ===== ETIQUETAS DE SLOTS POR TIPO DE SERVICIO =====
-// Para agregar un nuevo tipo: copia una entrada y adapta las etiquetas
-const SLOTS_LABEL = {
-  washtower: {
-    serie: 'Nº Serie',
-    accesorios: 'Accesorios (Manguera + Llave)',
-    presion: 'Presión de Agua (0,5 ~ 8,0 kgf/cm²)',
-    alimentacion: 'Alimentación Eléctrica (220 V)',
-    nivelacion: 'Nivelación',
-    equipo: 'Foto del Equipo Instalado',
-  },
-  refrigerador: {
-    serie: 'Nº Serie',
-    accesorios: 'Instalación (Toma de agua)',
-    presion: 'Temperatura (Configuración)',
-    alimentacion: 'Alimentación Eléctrica (220 V)',
-    nivelacion: 'Nivelación',
-    equipo: 'Foto del Equipo Instalado',
-  },
-}
+// Las etiquetas de tipo y de slots vienen de la config del backend (useModulos).
 
 export default function InformePreview() {
   const { id } = useParams()
   const nav = useNavigate()
+  const toast = useToast()
+  const { porTipo } = useModulos()
   const [informe, setInforme] = useState(null)
+  const [exporting, setExporting] = useState(false)
 
   useEffect(() => {
     informesApi.obtener(id).then(({ data }) => setInforme(data))
   }, [id])
 
+  const exportar = async () => {
+    setExporting(true)
+    try {
+      await informesApi.descargar(id, 'xlsx')
+      toast.success('Plantilla exportada correctamente.')
+    } catch {
+      toast.error('No se pudo exportar la plantilla.')
+    } finally {
+      setExporting(false)
+    }
+  }
+
   if (!informe) return <div className="text-warm-mute">Cargando...</div>
 
-  const slots = SLOTS_LABEL[informe.tipoServicio] ?? SLOTS_LABEL.washtower
-  const tipoLabel = TIPO_SERVICIO_LABEL[informe.tipoServicio] ?? informe.tipoServicio
-  const fotoOf = (slot) => informe.fotos.find(f => f.slot === slot)
+  const modulo = porTipo[informe.tipoServicio]
+  const slots = modulo?.slots ?? []
+  const tipoLabel = modulo?.label ?? informe.tipoServicio
+  const fotoOf = (slot) => {
+    const f = informe.fotos.find(f => f.slot === slot)
+    return f ? { ...f, url: f.url } : undefined
+  }
 
   return (
-    <div className="space-y-5 max-w-3xl">
+    <div className="space-y-5 max-w-3xl animate-fade-up">
       {/* Encabezado */}
       <div className="flex flex-wrap items-center gap-3 justify-between">
         <div className="flex items-center gap-3">
@@ -70,11 +67,8 @@ export default function InformePreview() {
             <div className="text-[11px] text-warm-mute">Vista previa del informe</div>
           </div>
         </div>
-        <button
-          onClick={() => informesApi.descargar(id, 'xlsx')}
-          className="btn-primary"
-        >
-          📊 Exportar plantilla
+        <button onClick={exportar} disabled={exporting} className="btn-primary">
+          {exporting ? 'Generando…' : '📊 Exportar plantilla'}
         </button>
       </div>
 
@@ -119,13 +113,13 @@ export default function InformePreview() {
       {/* Fotos */}
       <PreviewSection titulo={`Fotos del Servicio · ${tipoLabel}`}>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-          {Object.entries(slots).map(([slot, etiqueta]) => {
+          {slots.map(({ key: slot, label: etiqueta }) => {
             const foto = fotoOf(slot)
             return (
               <div key={slot} className="border border-warm-line rounded-xl overflow-hidden">
                 {foto ? (
-                  <img
-                    src={foto.url}
+                  <AuthImage
+                    path={foto.url}
                     alt={etiqueta}
                     className="w-full h-36 object-cover"
                   />
@@ -134,7 +128,7 @@ export default function InformePreview() {
                     <span className="text-warm-mute text-xs">Sin foto</span>
                   </div>
                 )}
-                <div className="px-2 py-1.5 bg-white border-t border-warm-line">
+                <div className="px-2 py-1.5 bg-warm-card border-t border-warm-line">
                   <p className="text-[10px] text-warm-mute leading-tight">{etiqueta}</p>
                 </div>
               </div>

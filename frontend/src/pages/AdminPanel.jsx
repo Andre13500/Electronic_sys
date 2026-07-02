@@ -1,14 +1,20 @@
 import { useEffect, useState } from 'react'
 import { adminApi } from '../services/api'
+import { useToast } from '../components/Toast.jsx'
+import { Avatar } from '../components/ui.jsx'
 
 const fmtFecha = (d) => new Date(d).toLocaleDateString('es-EC', {
   day: '2-digit', month: 'short', year: 'numeric'
 })
 
+const ROL_LABEL = { Admin: 'Administrador', Tecnico: 'Técnico' }
+
 export default function AdminPanel() {
+  const toast = useToast()
   const [usuarios, setUsuarios] = useState([])
   const [loading, setLoading] = useState(true)
   const [showCrear, setShowCrear] = useState(false)
+  const [verPerfil, setVerPerfil] = useState(null) // usuario a visualizar (solo lectura)
   const [resultado, setResultado] = useState(null) // { tipo: 'crear' | 'reset', datos }
   const [error, setError] = useState(null)
 
@@ -30,8 +36,10 @@ export default function AdminPanel() {
       const { data } = await adminApi.resetPassword(usuario.id)
       setResultado({ tipo: 'reset', nombre: usuario.nombre, password: data.passwordTemporal })
       await cargar()
+      toast.success(`Contraseña restablecida para ${usuario.nombre}.`)
     } catch (e) {
-      setError(e.response?.data?.error ?? 'Error al restablecer contraseña')
+      const msg = e.response?.data?.error ?? 'Error al restablecer contraseña'
+      setError(msg); toast.error(msg)
     }
   }
 
@@ -42,16 +50,18 @@ export default function AdminPanel() {
     try {
       await adminApi.toggleActivo(usuario.id, !usuario.activo)
       await cargar()
+      toast.success(`Usuario ${usuario.activo ? 'desactivado' : 'activado'}.`)
     } catch (e) {
-      setError(e.response?.data?.error ?? 'Error al actualizar usuario')
+      const msg = e.response?.data?.error ?? 'Error al actualizar usuario'
+      setError(msg); toast.error(msg)
     }
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 animate-fade-up">
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
         <div>
-          <h2 className="text-xl font-semibold text-warm-ink">Gestión de Usuarios</h2>
+          <h2 className="text-2xl font-bold text-warm-ink tracking-tight">Gestión de Usuarios</h2>
           <p className="text-sm text-warm-mute mt-0.5">Crea y administra las cuentas de los técnicos.</p>
         </div>
         <button onClick={() => { setShowCrear(true); setResultado(null); setError(null) }} className="btn-primary">
@@ -96,8 +106,14 @@ export default function AdminPanel() {
             setResultado({ tipo: 'crear', ...datos })
             setShowCrear(false)
             cargar()
+            toast.success(`Usuario ${datos.nombre} creado.`)
           }}
         />
+      )}
+
+      {/* Modal de ver perfil (solo lectura). El Admin nunca ve contraseñas. */}
+      {verPerfil && (
+        <VerPerfilModal usuario={verPerfil} onClose={() => setVerPerfil(null)} />
       )}
 
       {/* Tabla de usuarios */}
@@ -121,12 +137,17 @@ export default function AdminPanel() {
                 {usuarios.map(u => (
                   <tr key={u.id} className="hover:bg-warm-bg/50">
                     <td className="px-4 py-3">
-                      <div className="font-medium text-warm-ink">{u.nombre}</div>
-                      {u.mustChangePassword && (
-                        <span className="text-[10px] text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-full">
-                          Debe cambiar contraseña
-                        </span>
-                      )}
+                      <div className="flex items-center gap-2.5">
+                        <Avatar nombre={u.nombre} size="sm" />
+                        <div>
+                          <div className="font-medium text-warm-ink">{u.nombre}</div>
+                          {u.mustChangePassword && (
+                            <span className="text-[10px] text-amber-600 bg-amber-50 dark:bg-amber-500/15 dark:text-amber-300 px-1.5 py-0.5 rounded-full">
+                              Debe cambiar contraseña
+                            </span>
+                          )}
+                        </div>
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-warm-mute">{u.email}</td>
                     <td className="px-4 py-3">
@@ -148,6 +169,13 @@ export default function AdminPanel() {
                     <td className="px-4 py-3 text-warm-mute text-xs">{fmtFecha(u.creadoEn)}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2 justify-end">
+                        <button
+                          onClick={() => setVerPerfil(u)}
+                          className="text-xs text-warm-mute hover:text-brand-600 transition-colors"
+                          title="Ver perfil"
+                        >
+                          👁 Ver
+                        </button>
                         <button
                           onClick={() => resetPassword(u)}
                           className="text-xs text-warm-mute hover:text-brand-600 transition-colors"
@@ -203,8 +231,8 @@ function CrearUsuarioModal({ onClose, onCreado }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in" onClick={onClose}>
+      <div className="card-glass shadow-lift w-full max-w-md p-6 animate-scale-in" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-5">
           <h3 className="font-semibold text-warm-ink">Crear nuevo usuario</h3>
           <button onClick={onClose} className="text-warm-mute hover:text-warm-ink text-xl leading-none">&times;</button>
@@ -245,6 +273,49 @@ function CrearUsuarioModal({ onClose, onCreado }) {
           </div>
         </form>
       </div>
+    </div>
+  )
+}
+
+// Vista de solo lectura del perfil de otro usuario.
+// El Admin SOLO puede ver: nombre, usuario, correo y rol. Nunca la contraseña.
+function VerPerfilModal({ usuario, onClose }) {
+  return (
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in" onClick={onClose}>
+      <div className="card-glass shadow-lift w-full max-w-sm p-6 animate-scale-in" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-semibold text-warm-ink">Perfil del usuario</h3>
+          <button onClick={onClose} className="text-warm-mute hover:text-warm-ink text-xl leading-none">&times;</button>
+        </div>
+        <div className="flex flex-col items-center text-center mb-5">
+          <Avatar nombre={usuario.nombre} size="lg" className="mb-3" />
+          <div className="font-semibold text-warm-ink">{usuario.nombre}</div>
+          <span className={`badge mt-2 ${usuario.rol === 'Admin'
+            ? 'bg-brand-50 text-brand-700 dark:bg-brand-600/20 dark:text-brand-200'
+            : 'bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300'}`}>
+            {ROL_LABEL[usuario.rol] ?? usuario.rol}
+          </span>
+        </div>
+        <dl className="space-y-3 text-sm">
+          <ReadRow label="Usuario" value={usuario.email} />
+          <ReadRow label="Correo electrónico" value={usuario.email} />
+          <ReadRow label="Rol" value={ROL_LABEL[usuario.rol] ?? usuario.rol} />
+          <ReadRow label="Estado" value={usuario.activo ? 'Activo' : 'Inactivo'} />
+          <ReadRow label="Creado" value={fmtFecha(usuario.creadoEn)} />
+        </dl>
+        <p className="text-[11px] text-warm-mute mt-5 flex items-center gap-1.5">
+          <span>🔒</span> Por seguridad, las contraseñas nunca son visibles.
+        </p>
+      </div>
+    </div>
+  )
+}
+
+function ReadRow({ label, value }) {
+  return (
+    <div className="flex items-center justify-between gap-3 border-b border-warm-line pb-2 last:border-0">
+      <dt className="text-warm-mute">{label}</dt>
+      <dd className="text-warm-ink font-medium text-right break-all">{value}</dd>
     </div>
   )
 }

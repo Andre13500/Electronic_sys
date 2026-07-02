@@ -5,7 +5,12 @@
       "launchBrowser": true,
       "launchUrl": "swagger",
       "applicationUrl": "http://localhost:5000",
-      "environmentVariables": { "ASPNETCORE_ENVIRONMENT": "Development" }
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "//": "En desarrollo local se usa SQLite (la BD de produccion en databaseasp.net solo es accesible desde el hosting). Este archivo NO se despliega, asi que produccion sigue usando SQL Server.",
+        "Database__Provider": "Sqlite",
+        "ConnectionStrings__conectionSql": "Data Source=local_dev.db"
+      }
     }
   }
 }

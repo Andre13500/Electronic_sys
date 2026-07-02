@@ -1,38 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { informesApi } from '../services/api'
+import { useModulos } from '../services/modulos'
 import FotoSlot from '../components/FotoSlot.jsx'
+import { useToast } from '../components/Toast.jsx'
+import { Skeleton } from '../components/ui.jsx'
 
-// ===== SLOTS POR TIPO DE SERVICIO =====
-// Para agregar un nuevo tipo de servicio:
-//   1. Agrega una entrada aquí con la key igual al TipoServicio del backend
-//   2. Los nombres de slot deben existir en InformeService.cs > SlotsValidos (backend)
-//   3. Si necesitas slots nuevos, agrégalos al array SlotsValidos en el backend
-// Para modificar etiquetas de un tipo existente: solo edita el texto de 'etiqueta' aquí
-const SLOTS_POR_TIPO = {
-  washtower: [
-    { slot: 'serie',        etiqueta: 'Nº Serie' },
-    { slot: 'accesorios',   etiqueta: 'Accesorios\n(Manguera + Llave)' },
-    { slot: 'presion',      etiqueta: 'Presión de Agua\n(0,5 ~ 8,0 kgf/cm²)' },
-    { slot: 'alimentacion', etiqueta: 'Alimentación Eléctrica (220 V)' },
-    { slot: 'nivelacion',   etiqueta: 'Nivelación' },
-    { slot: 'equipo',       etiqueta: 'Foto del Equipo Instalado' },
-  ],
-  // Slots para Refrigeradora — ajusta etiquetas según el informe oficial
-  refrigerador: [
-    { slot: 'serie',        etiqueta: 'Nº Serie' },
-    { slot: 'accesorios',   etiqueta: 'Instalación\n(Toma de agua)' },
-    { slot: 'presion',      etiqueta: 'Temperatura\n(Configuración)' },
-    { slot: 'alimentacion', etiqueta: 'Alimentación Eléctrica (220 V)' },
-    { slot: 'nivelacion',   etiqueta: 'Nivelación' },
-    { slot: 'equipo',       etiqueta: 'Foto del Equipo Instalado' },
-  ],
-}
+// Campos que se normalizan a MAYÚSCULAS y sin espacios sobrantes
+const CAMPOS_MAYUSCULAS = ['ordenServicio', 'numeroSerie', 'modeloProducto']
 
-const TIPO_LABEL = {
-  washtower: 'WashTower',
-  refrigerador: 'Refrigeradora',
-}
+// Los slots de fotos y las etiquetas por tipo YA NO se hardcodean aquí: se
+// obtienen del backend (Templates/config/*.json) vía useModulos().
 
 // Opciones de forma de pago (solo se guarda en web, NO va a la exportación)
 // Para agregar más opciones: añade una entrada aquí
@@ -46,11 +24,15 @@ const FORMAS_PAGO = [
 export default function InformeEditor() {
   const { id } = useParams()
   const nav = useNavigate()
+  const toast = useToast()
+  const { porTipo } = useModulos()
   const [informe, setInforme] = useState(null)
   const [form, setForm] = useState(null)
   const [saving, setSaving] = useState(false)
   const [savedAt, setSavedAt] = useState(null)
   const [exporting, setExporting] = useState(null)
+  const [confirmFinalizar, setConfirmFinalizar] = useState(false)
+  const [finalizando, setFinalizando] = useState(false)
   const debounceRef = useRef(null)
 
   const cargar = async () => {
@@ -80,18 +62,31 @@ export default function InformeEditor() {
     debounceRef.current = setTimeout(async () => {
       setSaving(true)
       try {
-        await informesApi.guardar(id, form)
+        // Limpieza final de espacios en los campos en mayúsculas antes de persistir
+        const payload = { ...form }
+        for (const k of CAMPOS_MAYUSCULAS) if (payload[k]) payload[k] = payload[k].trim()
+        await informesApi.guardar(id, payload)
         setSavedAt(new Date())
+      } catch {
+        toast.error('No se pudo guardar automáticamente.')
       } finally { setSaving(false) }
     }, 800)
     return () => debounceRef.current && clearTimeout(debounceRef.current)
   }, [form])
 
-  const upd = (k, v) => setForm(f => ({ ...f, [k]: v }))
+  // Actualiza un campo. Los campos de CAMPOS_MAYUSCULAS se convierten a
+  // mayúsculas y se les quitan los espacios iniciales mientras se escribe.
+  const upd = (k, v) => {
+    const val = CAMPOS_MAYUSCULAS.includes(k) ? v.toUpperCase().replace(/^\s+/, '') : v
+    setForm(f => ({ ...f, [k]: val }))
+  }
 
   const exportar = async (formato) => {
     setExporting(formato)
-    try { await informesApi.descargar(id, formato) }
+    try {
+      await informesApi.descargar(id, formato)
+      toast.success('Plantilla exportada correctamente.')
+    }
     catch (e) {
       let msg = 'No se pudo exportar'
       try {
@@ -101,25 +96,32 @@ export default function InformeEditor() {
         const json = JSON.parse(text)
         if (json?.error) msg = json.error
       } catch {}
-      alert(msg)
+      toast.error(msg)
     }
     finally { setExporting(null) }
   }
 
   const finalizar = async () => {
-    if (!confirm('¿Marcar informe como finalizado?')) return
+    setFinalizando(true)
     try {
       await informesApi.finalizar(id)
       await cargar()
-    } catch { alert('Error al finalizar') }
+      setConfirmFinalizar(false)
+      toast.success('Informe finalizado.')
+    } catch {
+      toast.error('Error al finalizar el informe.')
+    } finally {
+      setFinalizando(false)
+    }
   }
 
-  if (!form || !informe) return <div className="text-warm-mute">Cargando...</div>
+  if (!form || !informe) return <EditorSkeleton />
 
-  // Seleccionar los slots según el tipo de servicio del informe
-  // Si el tipo no está en SLOTS_POR_TIPO, usa washtower como fallback
-  const slots = SLOTS_POR_TIPO[informe.tipoServicio] ?? SLOTS_POR_TIPO.washtower
-  const tipoLabel = TIPO_LABEL[informe.tipoServicio] ?? informe.tipoServicio
+  // Los slots y la etiqueta del tipo vienen de la config del backend (useModulos).
+  // Mientras carga, se muestra una cuadrícula vacía; al llegar se puebla sola.
+  const modulo = porTipo[informe.tipoServicio]
+  const slots = modulo?.slots ?? []
+  const tipoLabel = modulo?.label ?? informe.tipoServicio
 
   const fotoOf = (slot) => {
     const f = informe.fotos.find(x => x.slot === slot)
@@ -185,11 +187,11 @@ export default function InformeEditor() {
           <Field label="Orden de Servicio (RNN)"
             value={form.ordenServicio}
             onChange={v => upd('ordenServicio', v)}
-            placeholder="Ej: RNN260411011353" />
+            placeholder="Ej: RNN260411011353" upper />
           <Field label="Número de Serie"
             value={form.numeroSerie}
             onChange={v => upd('numeroSerie', v)}
-            placeholder="Ej: 509TRVM8N495" />
+            placeholder="Ej: 509TRVM8N495" upper />
         </Row>
         <Field label="Nombre del Cliente"
           value={form.clienteNombre}
@@ -201,7 +203,7 @@ export default function InformeEditor() {
         <Field label="Modelo del Producto"
           value={form.modeloProducto}
           onChange={v => upd('modeloProducto', v)}
-          placeholder="Ej: WK25GGS6E" />
+          placeholder="Ej: WK25GGS6E" upper />
       </Section>
 
       {/* Forma de Pago — solo web, NO se exporta a la plantilla */}
@@ -220,7 +222,7 @@ export default function InformeEditor() {
                 className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
                   form.formaPago === op.value
                     ? 'bg-brand-600 text-white border-brand-600'
-                    : 'bg-white text-warm-ink border-warm-line hover:border-brand-300'
+                    : 'bg-warm-card text-warm-ink border-warm-line hover:border-brand-300'
                 }`}
               >
                 {op.label}
@@ -238,11 +240,11 @@ export default function InformeEditor() {
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           {slots.map(s => (
             <FotoSlot
-              key={s.slot}
+              key={s.key}
               informeId={id}
-              slot={s.slot}
-              etiqueta={s.etiqueta}
-              foto={fotoOf(s.slot)}
+              slot={s.key}
+              etiqueta={s.label}
+              foto={fotoOf(s.key)}
               onChange={cargar}
             />
           ))}
@@ -262,9 +264,50 @@ export default function InformeEditor() {
 
       {informe.estado === 'borrador' && (
         <div className="flex justify-end pt-2">
-          <button onClick={finalizar} className="btn-primary">Finalizar informe</button>
+          <button onClick={() => setConfirmFinalizar(true)} className="btn-primary">Finalizar informe</button>
         </div>
       )}
+
+      {/* Confirmación de finalizar (sin diálogo nativo bloqueante) */}
+      {confirmFinalizar && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in"
+          onClick={() => !finalizando && setConfirmFinalizar(false)}>
+          <div className="card-glass shadow-lift w-full max-w-sm p-6 animate-scale-in" onClick={e => e.stopPropagation()}>
+            <div className="w-12 h-12 rounded-2xl bg-brand-50 dark:bg-brand-600/15 text-brand-600 flex items-center justify-center mb-4">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" /></svg>
+            </div>
+            <h3 className="font-semibold text-warm-ink">Finalizar informe</h3>
+            <p className="text-sm text-warm-mute mt-1">Una vez finalizado, el informe quedará marcado como completado. ¿Deseas continuar?</p>
+            <div className="flex gap-3 mt-5">
+              <button onClick={() => setConfirmFinalizar(false)} disabled={finalizando} className="btn-secondary flex-1">Cancelar</button>
+              <button onClick={finalizar} disabled={finalizando} className="btn-primary flex-1">
+                {finalizando ? 'Finalizando…' : 'Sí, finalizar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function EditorSkeleton() {
+  return (
+    <div className="space-y-5 animate-fade-in">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Skeleton className="h-9 w-20" />
+          <Skeleton className="h-6 w-40" />
+        </div>
+        <Skeleton className="h-9 w-44" />
+      </div>
+      {Array.from({ length: 3 }).map((_, i) => (
+        <div key={i} className="card p-5 space-y-3">
+          <Skeleton className="h-4 w-32" />
+          <Skeleton className="h-11 w-full" />
+          <Skeleton className="h-11 w-full" />
+        </div>
+      ))}
     </div>
   )
 }
@@ -287,13 +330,21 @@ function Row({ children }) {
   return <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{children}</div>
 }
 
-function Field({ label, value, onChange, placeholder, hint }) {
+function Field({ label, value, onChange, placeholder, hint, upper }) {
+  // upper: el valor ya llega en mayúsculas desde upd(); al salir del campo se
+  // recortan los espacios sobrantes (inicio y final).
+  const onBlur = upper && value ? () => onChange(value.trim()) : undefined
   return (
     <div>
       <label className="label">{label}</label>
       {hint && <p className="text-[10px] text-warm-mute mb-1">{hint}</p>}
-      <input className="input" value={value || ''}
-        onChange={e => onChange(e.target.value)} placeholder={placeholder} />
+      <input
+        className={`input ${upper ? 'uppercase tracking-wide' : ''}`}
+        value={value || ''}
+        onChange={e => onChange(e.target.value)}
+        onBlur={onBlur}
+        placeholder={placeholder}
+      />
     </div>
   )
 }

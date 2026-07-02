@@ -1,46 +1,24 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { informesApi } from '../services/api'
+import { useModulos, imagenDeModulo } from '../services/modulos'
 
-// Importación directa de imágenes desde frontend/img/
-// Para agregar un nuevo módulo: pon la imagen aquí y agrega un import
-import washtowerImg from '../../img/washtower.jpg'
-import refrigeradorImg from '../../img/refrigerador.jpg'
-
-// ===== MÓDULOS DE SERVICIO =====
-// Para agregar un nuevo módulo de servicio:
-//   1. Importa la imagen arriba (import miModuloImg from '../../img/mimodulo.jpg')
-//   2. Agrega un objeto en este array con: key, label, descripcion, imagen
-//   3. En Models.cs (backend) > campo TipoServicio: documenta el nuevo valor
-//   4. En InformeEditor.jsx > SLOTS_POR_TIPO: agrega los slots del nuevo módulo
-//   5. En InformeService.cs (backend) > SlotsValidos: agrega nuevos slots si los hay
-//   6. En InformesList.jsx > TIPO_BADGE: agrega el badge de color para el listado
-//   7. En InformePreview.jsx > SLOTS_LABEL y TIPO_SERVICIO_LABEL: agrega etiquetas
-const MODULES = [
-  {
-    key: 'washtower',
-    label: 'WashTower',
-    descripcion: 'Lavadora Torre LG',
-    imagen: washtowerImg,
-  },
-  {
-    key: 'refrigerador',
-    label: 'Refrigeradora',
-    descripcion: 'Refrigerador LG',
-    imagen: refrigeradorImg,
-  },
-]
-
+// ===== SELECTOR DE MÓDULOS DE SERVICIO =====
+// La lista de módulos es DINÁMICA: viene del backend (Templates/config/*.json)
+// vía GET /api/informes/modulos. Para agregar un módulo nuevo NO se toca este
+// archivo — basta crear el JSON de config (y, opcionalmente, una imagen que se
+// registra en services/modulos.js > IMAGENES).
 export default function ModuleSelector() {
   const nav = useNavigate()
+  const { modulos, loading, error: errorCarga } = useModulos()
   const [creando, setCreando] = useState(null)
   const [error, setError] = useState(null)
 
   const seleccionar = async (modulo) => {
-    setCreando(modulo.key)
+    setCreando(modulo.tipo)
     setError(null)
     try {
-      const { data } = await informesApi.crear(modulo.key)
+      const { data } = await informesApi.crear(modulo.tipo)
       nav(`/informes/${data.id}`)
     } catch (e) {
       setError(e.response?.data?.error ?? 'No se pudo crear el informe')
@@ -49,32 +27,40 @@ export default function ModuleSelector() {
   }
 
   return (
-    <div>
+    <div className="animate-fade-up">
       <div className="mb-6">
         <button onClick={() => nav('/')} className="btn-ghost px-2 mb-3">← Volver</button>
-        <h2 className="text-xl font-semibold text-warm-ink">Selecciona el tipo de servicio</h2>
+        <h2 className="text-2xl font-bold text-warm-ink tracking-tight">Selecciona el tipo de servicio</h2>
         <p className="text-sm text-warm-mute mt-1">
           Elige el equipo para el que vas a generar el informe técnico.
         </p>
       </div>
 
-      {error && (
+      {(error || errorCarga) && (
         <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-2 mb-4">
-          {error}
+          {error || errorCarga}
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-2xl">
-        {MODULES.map((mod) => (
-          <ModuleCard
-            key={mod.key}
-            modulo={mod}
-            loading={creando === mod.key}
-            disabled={creando !== null}
-            onClick={() => seleccionar(mod)}
-          />
-        ))}
-      </div>
+      {loading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-4xl">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-60 rounded-2xl skeleton" />
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-4xl">
+          {modulos.map((mod) => (
+            <ModuleCard
+              key={mod.tipo}
+              modulo={mod}
+              loading={creando === mod.tipo}
+              disabled={creando !== null}
+              onClick={() => seleccionar(mod)}
+            />
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -82,6 +68,7 @@ export default function ModuleSelector() {
 function ModuleCard({ modulo, loading, disabled, onClick }) {
   const [hovered, setHovered] = useState(false)
   const [pressed, setPressed] = useState(false)
+  const imagen = imagenDeModulo(modulo)
 
   // Animación: hover = se levanta, click = baja un poco (efecto de presión)
   const getTransform = () => {
@@ -91,7 +78,7 @@ function ModuleCard({ modulo, loading, disabled, onClick }) {
   }
 
   const getShadow = () => {
-    if (pressed) return '0 8px 20px rgba(0,0,0,0.2), 0 2px 8px rgba(165,0,52,0.15)'
+    if (pressed) return '0 8px 20px rgba(255, 40, 40, 0.88), 0 2px 8px rgba(255, 248, 54, 0.77)'
     if (hovered) return '0 25px 50px rgba(0,0,0,0.3), 0 8px 20px rgba(165,0,52,0.2)'
     return '0 4px 15px rgba(0,0,0,0.08)'
   }
@@ -116,23 +103,44 @@ function ModuleCard({ modulo, loading, disabled, onClick }) {
             : 'transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.35s ease',
         }}
       >
-        {/* Imagen con altura fija */}
-        <div className="relative h-64 overflow-hidden">
-          <img
-            src={modulo.imagen}
-            alt={modulo.label}
-            className="w-full h-full object-cover"
-            style={{
-              transform: hovered ? 'scale(1.06)' : 'scale(1)',
-              transition: 'transform 0.5s ease',
-            }}
-          />
+        {/* Imagen con altura fija (o degradado + icono si no hay imagen) */}
+        <div className="relative h-60 overflow-hidden rounded-2xl">
+          {imagen ? (
+            <img
+              src={imagen}
+              alt={modulo.label}
+              className="w-full h-full object-contain"
+              style={{
+                transform: hovered ? 'scale(1.00)' : 'scale(0.90)',
+                transition: 'transform 0.7s ease',
+              }}
+            />
+          ) : (
+            <div
+              className="w-full h-full flex items-center justify-center"
+              style={{
+                background: 'linear-gradient(135deg, #a50034 0%, #4a0018 100%)',
+              }}
+            >
+              <span
+                className="text-7xl"
+                style={{
+                  transform: hovered ? 'scale(1.05)' : 'scale(1)',
+                  transition: 'transform 0.5s ease',
+                }}
+              >
+                {modulo.icono || '🔧'}
+              </span>
+            </div>
+          )}
 
-          {/* Degradado: negro abajo → rojo LG en el centro → oscuro arriba */}
+          {/* Degradado inferior para legibilidad del texto */}
           <div
             className="absolute inset-0"
             style={{
-              background: 'linear-gradient(to top, rgba(0,0,0,0.88) 0%, rgba(165,0,52,0.4) 40%, rgba(20,20,20,0.25) 100%)',
+              background: imagen
+                ? 'linear-gradient(to top, rgba(68, 230, 242, 0.63) 0%, rgba(175, 229, 251, 0.4) 40%, rgba(20,20,20,0.25) 100%)'
+                : 'linear-gradient(to top, rgba(20,20,20,0.55) 0%, rgba(20,20,20,0.1) 45%, transparent 100%)',
             }}
           />
 
@@ -140,7 +148,7 @@ function ModuleCard({ modulo, loading, disabled, onClick }) {
           <div
             className="absolute inset-0 pointer-events-none"
             style={{
-              background: 'linear-gradient(135deg, rgba(255,255,255,0.07) 0%, transparent 55%)',
+              background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.49) 0%, transparent 55%)',
               opacity: hovered ? 1 : 0,
               transition: 'opacity 0.3s ease',
             }}
@@ -150,7 +158,7 @@ function ModuleCard({ modulo, loading, disabled, onClick }) {
           <div
             className="absolute inset-0 rounded-2xl pointer-events-none"
             style={{
-              boxShadow: `inset 0 0 0 2px rgba(165,0,52,${hovered ? '0.6' : '0'})`,
+              boxShadow: `inset 0px 0px 0 3px ${hovered ? '#d85252a2' : 'transparent'}`,
               transition: 'box-shadow 0.3s ease',
             }}
           />
@@ -180,7 +188,7 @@ function ModuleCard({ modulo, loading, disabled, onClick }) {
                     transition: 'color 0.3s ease',
                   }}
                 >
-                  <span>Crear informe</span>
+                  <span>Generar informe</span>
                   <svg
                     className="w-4 h-4"
                     style={{

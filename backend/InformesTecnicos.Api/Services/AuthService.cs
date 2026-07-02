@@ -14,6 +14,7 @@ public interface IAuthService
 {
     Task<LoginResponse?> LoginAsync(LoginRequest req);
     Task<string?> ChangePasswordAsync(int userId, ChangePasswordRequest req);
+    Task<PerfilDto?> GetPerfilAsync(int userId);
 }
 
 public class AuthService : IAuthService
@@ -47,6 +48,15 @@ public class AuthService : IAuthService
         await _db.SaveChangesAsync();
 
         return GenerarToken(u);
+    }
+
+    // Devuelve los datos del perfil del usuario autenticado.
+    // Solo expone datos públicos del perfil; nunca el hash de la contraseña.
+    public async Task<PerfilDto?> GetPerfilAsync(int userId)
+    {
+        var u = await _db.Usuarios.FindAsync(userId);
+        if (u is null) return null;
+        return new PerfilDto(u.Id, u.Nombre, u.Email, u.Rol, u.CreadoEn);
     }
 
     private string GenerarToken(Usuario u)

@@ -1,7 +1,10 @@
 import axios from 'axios'
 
+const API_URL = import.meta.env.VITE_API_URL ?? '/api'
+export const UPLOADS_BASE = API_URL.replace(/\/api\/?$/, '')
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL ?? '/api',
+  baseURL: API_URL,
   timeout: 30000,
 })
 
@@ -23,13 +26,17 @@ export const authApi = {
   login: (email, password) => api.post('/auth/login', { email, password }),
   changePassword: (passwordActual, passwordNuevo) =>
     api.post('/auth/change-password', { passwordActual, passwordNuevo }),
+  // Perfil del usuario autenticado (incluye fecha de creación). No expone contraseña.
+  me: () => api.get('/auth/me'),
 }
 
 export const informesApi = {
+  // Módulos de servicio disponibles (tipo, label, descripción, icono, imagen, slots).
+  // Se definen en el backend en Templates/config/*.json — el frontend no los hardcodea.
+  modulos: () => api.get('/informes/modulos'),
   listar: (q) => api.get('/informes', { params: q ? { q } : {} }),
   obtener: (id) => api.get(`/informes/${id}`),
-  // tipoServicio: "washtower" | "refrigerador"
-  // Para agregar un nuevo tipo ver: Models.cs > TipoServicio y ModuleSelector.jsx > MODULES
+  // tipoServicio: uno de los tipos dinámicos devueltos por modulos() (ver Templates/config/*.json)
   crear: (tipoServicio) => api.post('/informes', { tipoServicio }),
   guardar: (id, data) => api.put(`/informes/${id}`, data),
   subirFoto: (id, slot, file) => {
@@ -40,19 +47,33 @@ export const informesApi = {
   },
   eliminarFoto: (id, fotoId) => api.delete(`/informes/${id}/fotos/${fotoId}`),
   finalizar: (id) => api.post(`/informes/${id}/finalizar`),
+  eliminar: (id) => api.delete(`/informes/${id}`),
   descargar: async (id, formato) => {
     const url = formato === 'pdf'
       ? `/informes/${id}/exportar/pdf`
       : `/informes/${id}/exportar/excel`
     const res = await api.get(url, { responseType: 'blob' })
-    const blob = new Blob([res.data])
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(blob)
+
+    // Tipo MIME correcto para que el móvil sepa qué archivo es.
+    const mime = formato === 'pdf'
+      ? 'application/pdf'
+      : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    const blob = new Blob([res.data], { type: mime })
+
     const cd = res.headers['content-disposition'] || ''
     const m = cd.match(/filename="?([^"]+)"?/)
-    a.download = m ? m[1] : (formato === 'pdf' ? 'informe.pdf' : 'informe.xlsx')
+    const filename = m ? m[1] : (formato === 'pdf' ? 'informe.pdf' : 'informe.xlsx')
+
+    const objUrl = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = objUrl
+    a.download = filename
+    a.rel = 'noopener'
+    // IMPORTANTE en móviles (Android/Chrome): el enlace debe estar en el DOM
+    // y NO se debe revocar la URL de inmediato, o la descarga se cancela.
+    document.body.appendChild(a)
     a.click()
-    URL.revokeObjectURL(a.href)
+    setTimeout(() => { a.remove(); URL.revokeObjectURL(objUrl) }, 1500)
   },
 }
 

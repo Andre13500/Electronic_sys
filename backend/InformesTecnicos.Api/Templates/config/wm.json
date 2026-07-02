@@ -1,0 +1,25 @@
+{
+  "tipo": "wm",
+  "label": "Lavadora (WM)",
+  "descripcion": "Lavadora LG",
+  "icono": "🌀",
+  "imagen": "lavadora.jpg",
+  "plantilla": "Informe de instalacion - WM.xlsx",
+  "campos": {
+    "TallerNombre": "B10",
+    "TecnicoResponsable": "H10",
+    "OrdenServicio": "B16",
+    "NumeroSerie": "I16",
+    "ClienteNombre": "B18",
+    "LugarInstalacion": "B20",
+    "ModeloProducto": "B22"
+  },
+  "slots": [
+    { "key": "serie",        "label": "Nº Serie",                                   "anchor": [1,  36, 5,  45] },
+    { "key": "accesorios",   "label": "Accesorios (Manguera + Llave)",              "anchor": [6,  36, 10, 45] },
+    { "key": "presion",      "label": "Presión de Agua (1.0 ~ 10.0 Kgf/cm²)",       "anchor": [11, 36, 15, 45] },
+    { "key": "alimentacion", "label": "Alimentación Eléctrica (110/220 V)",         "anchor": [1,  50, 5,  59] },
+    { "key": "nivelacion",   "label": "Nivelación",                                 "anchor": [6,  50, 10, 59] },
+    { "key": "equipo",       "label": "Foto del Equipo Instalado",                  "anchor": [11, 50, 15, 59] }
+  ]
+}
