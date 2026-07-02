@@ -14,29 +14,34 @@ public interface IInformeService
     Task<FotoDto> SubirFotoAsync(int id, string slot, IFormFile archivo, IWebHostEnvironment env);
     Task EliminarFotoAsync(int id, int fotoId, IWebHostEnvironment env);
     Task<InformeDto> FinalizarAsync(int id);
+    Task EliminarAsync(int id, int solicitanteId, bool esAdmin, IWebHostEnvironment env);
+    Task<(string fullPath, string contentType)?> ObtenerFotoArchivoAsync(
+        int informeId, int fotoId, int solicitanteId, bool esAdmin, IWebHostEnvironment env);
 }
 
 public class InformeService : IInformeService
 {
-    // ===== SLOTS VÁLIDOS =====
-    // Para agregar slots de un nuevo tipo de servicio:
-    //   1. Añade los nombres de slot a este array
-    //   2. En el frontend: InformeEditor.jsx > SLOTS_POR_TIPO
-    //   3. En ExcelExportService.cs agrega el mapeo de slot → rango de celda para el nuevo tipo
-    private static readonly string[] SlotsValidos =
-        { "serie", "accesorios", "presion", "alimentacion", "nivelacion", "equipo" };
+    // Los slots válidos ya NO se listan aquí: cada tipo de servicio declara sus
+    // slots en Templates/config/{tipo}.json y se validan vía ITemplateConfigService.
+    // Para agregar un módulo nuevo no se toca este archivo — ver TemplateConfigService.cs.
 
     // Nombre del taller por defecto (pre-llenado al crear informe)
     // Cambia este valor si el nombre del taller cambia
     private const string TallerPorDefecto = "Electronic Shop";
 
     private readonly AppDbContext _db;
-    public InformeService(AppDbContext db) => _db = db;
+    private readonly ITemplateConfigService _config;
+    public InformeService(AppDbContext db, ITemplateConfigService config)
+    { _db = db; _config = config; }
 
     public async Task<InformeDto> CrearAsync(int tecnicoId, string tipoServicio)
     {
         var tecnico = await _db.Usuarios.FindAsync(tecnicoId)
             ?? throw new InvalidOperationException("Técnico no encontrado.");
+
+        // Validar que el tipo de servicio esté registrado (tiene su config .json)
+        if (_config.Get(tipoServicio) is null)
+            throw new InvalidOperationException($"Tipo de servicio no válido: {tipoServicio}");
 
         var anyo = DateTime.UtcNow.Year;
         var n = await _db.Informes.CountAsync(i => i.CreadoEn.Year == anyo) + 1;
@@ -107,10 +112,11 @@ public class InformeService : IInformeService
 
     public async Task<FotoDto> SubirFotoAsync(int id, string slot, IFormFile archivo, IWebHostEnvironment env)
     {
-        if (!SlotsValidos.Contains(slot))
-            throw new InvalidOperationException("Slot inválido.");
         var informe = await _db.Informes.Include(i => i.Fotos).FirstOrDefaultAsync(i => i.Id == id)
             ?? throw new InvalidOperationException("Informe no encontrado.");
+        // El slot debe existir en la configuración del tipo de servicio del informe
+        if (!_config.SlotValido(informe.TipoServicio, slot))
+            throw new InvalidOperationException("Slot inválido para este tipo de servicio.");
         if (archivo.Length == 0) throw new InvalidOperationException("Archivo vacío.");
 
         var anterior = informe.Fotos.FirstOrDefault(f => f.Slot == slot);
@@ -135,7 +141,8 @@ public class InformeService : IInformeService
         _db.Fotos.Add(foto);
         informe.ActualizadoEn = DateTime.UtcNow;
         await _db.SaveChangesAsync();
-        return new FotoDto(foto.Id, foto.Slot, foto.RutaRelativa);
+        // La URL apunta al endpoint autenticado, no al archivo estático público.
+        return new FotoDto(foto.Id, foto.Slot, $"/informes/{id}/fotos/{foto.Id}/imagen");
     }
 
     public async Task EliminarFotoAsync(int id, int fotoId, IWebHostEnvironment env)
@@ -154,6 +161,60 @@ public class InformeService : IInformeService
         i.ActualizadoEn = DateTime.UtcNow;
         await _db.SaveChangesAsync();
         return (await ObtenerAsync(id))!;
+    }
+
+    // Elimina un informe con sus fotos (registros en BD y archivos en disco).
+    // Autorización: un Técnico solo puede eliminar SUS informes; un Admin, cualquiera.
+    public async Task EliminarAsync(int id, int solicitanteId, bool esAdmin, IWebHostEnvironment env)
+    {
+        var informe = await _db.Informes.Include(i => i.Fotos).FirstOrDefaultAsync(i => i.Id == id)
+            ?? throw new InvalidOperationException("Informe no encontrado.");
+
+        if (!esAdmin && informe.TecnicoId != solicitanteId)
+            throw new UnauthorizedAccessException("No tienes permiso para eliminar este informe.");
+
+        // Borrar los archivos físicos de las fotos y la carpeta del informe
+        foreach (var f in informe.Fotos)
+            EliminarArchivo(env, f.RutaRelativa);
+        try
+        {
+            var dir = Path.Combine(env.ContentRootPath, "uploads", id.ToString());
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+        catch { }
+
+        // Borrar las fotos y el informe de la base de datos
+        _db.Fotos.RemoveRange(informe.Fotos);
+        _db.Informes.Remove(informe);
+        await _db.SaveChangesAsync();
+    }
+
+    // Devuelve la RUTA de una foto para servirla de forma autenticada (streaming).
+    // Autorización: un Técnico solo accede a fotos de SUS informes; un Admin, cualquiera.
+    // Retorna null si el informe/foto/archivo no existe.
+    public async Task<(string fullPath, string contentType)?> ObtenerFotoArchivoAsync(
+        int informeId, int fotoId, int solicitanteId, bool esAdmin, IWebHostEnvironment env)
+    {
+        // Una sola consulta directa a la foto (con su informe) en vez de cargar todas las fotos.
+        var foto = await _db.Fotos
+            .Include(f => f.Informe)
+            .FirstOrDefaultAsync(f => f.Id == fotoId && f.InformeId == informeId);
+        if (foto is null) return null;
+
+        if (!esAdmin && foto.Informe.TecnicoId != solicitanteId)
+            throw new UnauthorizedAccessException("No tienes permiso para ver esta foto.");
+
+        var path = Path.Combine(env.ContentRootPath, foto.RutaRelativa.TrimStart('/'));
+        if (!File.Exists(path)) return null;
+
+        var ext = Path.GetExtension(path).ToLowerInvariant();
+        var contentType = ext switch
+        {
+            ".png"  => "image/png",
+            ".webp" => "image/webp",
+            _       => "image/jpeg"
+        };
+        return (path, contentType);
     }
 
     private static void EliminarArchivo(IWebHostEnvironment env, string rutaRelativa)
@@ -175,5 +236,6 @@ public class InformeService : IInformeService
         i.LugarInstalacion, i.ModeloProducto, i.Observaciones,
         i.FormaPago,
         i.Estado, i.CreadoEn, i.ActualizadoEn,
-        i.Fotos.Select(f => new FotoDto(f.Id, f.Slot, f.RutaRelativa)).ToList());
+        // URL al endpoint autenticado que sirve la imagen (no al archivo estático público).
+        i.Fotos.Select(f => new FotoDto(f.Id, f.Slot, $"/informes/{i.Id}/fotos/{f.Id}/imagen")).ToList());
 }

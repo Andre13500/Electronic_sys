@@ -38,4 +38,15 @@ public class AuthController : ControllerBase
             ? BadRequest(new { error = "Contraseña actual incorrecta." })
             : Ok(new { token });
     }
+
+    // Devuelve el perfil del usuario autenticado (incluye fecha de creación).
+    // Nunca expone la contraseña ni el hash.
+    [HttpGet("me")]
+    [Authorize]
+    public async Task<IActionResult> Me()
+    {
+        var userId = int.Parse(User.FindFirstValue(JwtRegisteredClaimNames.Sub) ?? "0");
+        var perfil = await _auth.GetPerfilAsync(userId);
+        return perfil is null ? NotFound() : Ok(perfil);
+    }
 }

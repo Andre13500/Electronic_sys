@@ -1,0 +1,25 @@
+{
+  "tipo": "rac",
+  "label": "Aire Acondicionado (RAC)",
+  "descripcion": "Split Evaporadora + Condensadora LG",
+  "icono": "🌬️",
+  "imagen": "aireAcondicionado.jpg",
+  "plantilla": "Informe de instalacion - RAC.xlsx",
+  "campos": {
+    "TallerNombre": "B10",
+    "TecnicoResponsable": "H10",
+    "OrdenServicio": "B16",
+    "ClienteNombre": "B18",
+    "LugarInstalacion": "B20",
+    "ModeloProducto": "B22",
+    "NumeroSerie": "H22"
+  },
+  "slots": [
+    { "key": "serie_evap",        "label": "Nº Serie - Evaporadora",                "anchor": [1,  35, 5,  44] },
+    { "key": "serie_cond",        "label": "Nº Serie - Condensadora",               "anchor": [6,  35, 10, 44] },
+    { "key": "electrica",         "label": "Instalación Eléctrica",                 "anchor": [11, 35, 15, 44] },
+    { "key": "unidad_interior",   "label": "Unidad interior (foto amplia)",         "anchor": [1,  51, 5,  60] },
+    { "key": "unidad_exterior",   "label": "Unidad exterior (foto amplia)",         "anchor": [6,  51, 10, 60] },
+    { "key": "instalacion_dist",  "label": "Instalación (distancia ≥ 3 metros)",    "anchor": [11, 51, 15, 60] }
+  ]
+}

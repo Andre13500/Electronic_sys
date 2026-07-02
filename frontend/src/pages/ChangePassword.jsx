@@ -37,7 +37,7 @@ export default function ChangePassword() {
 
   return (
     <div className="min-h-screen bg-warm-bg flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
+      <div className="w-full max-w-md animate-fade-up">
         <div className="card p-8">
           <div className="text-center mb-6">
             <div className="w-12 h-12 rounded-xl bg-brand-600 text-white flex items-center justify-center font-bold text-lg mx-auto mb-3">LG</div>

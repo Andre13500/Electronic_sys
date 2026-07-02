@@ -1,0 +1,25 @@
+{
+  "tipo": "estufas",
+  "label": "Estufas a Gas",
+  "descripcion": "Estufa / Cocina a Gas LG",
+  "icono": "🔥",
+  "imagen": "estufa.jpg",
+  "plantilla": "Informe de instalacion - Estufas.xlsx",
+  "campos": {
+    "TallerNombre": "B10",
+    "TecnicoResponsable": "H10",
+    "OrdenServicio": "B16",
+    "NumeroSerie": "I16",
+    "ClienteNombre": "B18",
+    "LugarInstalacion": "B20",
+    "ModeloProducto": "B22"
+  },
+  "slots": [
+    { "key": "serie",        "label": "Nº Serie",                                   "anchor": [1,  37, 5,  46] },
+    { "key": "accesorios",   "label": "Accesorios (Manguera, Regulador, etc)",      "anchor": [6,  37, 10, 46] },
+    { "key": "presion",      "label": "Presión de Regulador (0.4 ~ 0.5 Psi)",       "anchor": [11, 37, 15, 46] },
+    { "key": "hermeticidad", "label": "Prueba de hermeticidad (jabón líquido)",     "anchor": [1,  54, 5,  63] },
+    { "key": "nivelacion",   "label": "Nivelación",                                 "anchor": [6,  54, 10, 63] },
+    { "key": "equipo",       "label": "Foto del Equipo Instalado",                  "anchor": [11, 54, 15, 63] }
+  ]
+}

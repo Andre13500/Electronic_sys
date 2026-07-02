@@ -1,9 +1,12 @@
 import { useRef, useState } from 'react'
 import { informesApi } from '../services/api'
+import { useToast } from './Toast.jsx'
+import AuthImage from './AuthImage.jsx'
 
 export default function FotoSlot({ informeId, slot, etiqueta, foto, onChange }) {
   const inputRef = useRef(null)
   const [busy, setBusy] = useState(false)
+  const toast = useToast()
 
   const subir = async (file) => {
     if (!file) return
@@ -11,8 +14,9 @@ export default function FotoSlot({ informeId, slot, etiqueta, foto, onChange }) 
     try {
       await informesApi.subirFoto(informeId, slot, file)
       await onChange()
+      toast.success('Foto subida.')
     } catch (e) {
-      alert('No se pudo subir la foto')
+      toast.error('No se pudo subir la foto.')
     } finally {
       setBusy(false)
       if (inputRef.current) inputRef.current.value = ''
@@ -39,16 +43,16 @@ export default function FotoSlot({ informeId, slot, etiqueta, foto, onChange }) 
         type="button"
         onClick={() => inputRef.current?.click()}
         disabled={busy}
-        className="relative w-full aspect-[4/3] rounded-lg border-2 border-dashed border-warm-line bg-white hover:border-brand-400 hover:bg-brand-50/30 transition-colors flex items-center justify-center overflow-hidden group"
+        className="relative w-full aspect-[4/3] rounded-xl border-2 border-dashed border-warm-line bg-warm-card hover:border-brand-400 hover:bg-brand-50/40 dark:hover:bg-brand-600/10 transition-colors flex items-center justify-center overflow-hidden group"
       >
         {busy && (
-          <div className="absolute inset-0 bg-white/80 flex items-center justify-center z-10 text-xs text-warm-mute">
+          <div className="absolute inset-0 bg-warm-card/80 flex items-center justify-center z-10 text-xs text-warm-mute">
             Subiendo...
           </div>
         )}
         {foto ? (
           <>
-            <img src={foto.url} alt={etiqueta}
+            <AuthImage path={foto.url} alt={etiqueta}
               className="w-full h-full object-cover" />
             <span onClick={eliminar}
               className="absolute top-1.5 right-1.5 w-7 h-7 rounded-full bg-black/55 text-white text-xs flex items-center justify-center hover:bg-black/75 cursor-pointer">

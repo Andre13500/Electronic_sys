@@ -4,6 +4,10 @@ node_modules
 **/bin/
 **/obj/
 
+# Paquetes de publicación (no subir al repo — pueden contener secretos)
+**/publish/
+**/publish_deploy/
+
 # Base de datos local (no subir al repo; en producción se crea en /data)
 *.db
 *.db-shm
@@ -15,6 +19,10 @@ backend/InformesTecnicos.Api/uploads/
 # Variables de entorno locales
 .env
 .env.local
+
+# Credenciales / secretos — NUNCA subir al repo (la plantilla .example sí se sube)
+appsettings.Secrets.json
+**/appsettings.Secrets.json
 
 # Visual Studio / Rider workspace temp files
 .vs/

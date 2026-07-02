@@ -10,6 +10,7 @@ const InformePreview = lazy(() => import('./pages/InformePreview.jsx'))
 const ModuleSelector = lazy(() => import('./pages/ModuleSelector.jsx'))
 const AdminPanel     = lazy(() => import('./pages/AdminPanel.jsx'))
 const ChangePassword = lazy(() => import('./pages/ChangePassword.jsx'))
+const Perfil         = lazy(() => import('./pages/Perfil.jsx'))
 
 function Spinner() {
   return (
@@ -46,6 +47,7 @@ export default function App() {
           <Route path="nuevo-informe" element={<ModuleSelector />} />
           <Route path="informes/:id" element={<InformeEditor />} />
           <Route path="informes/:id/preview" element={<InformePreview />} />
+          <Route path="perfil" element={<Perfil />} />
           <Route path="admin" element={<AdminOnly><AdminPanel /></AdminOnly>} />
         </Route>
 

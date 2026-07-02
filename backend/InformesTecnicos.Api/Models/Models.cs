@@ -24,11 +24,11 @@ public class Informe
     public Usuario Tecnico { get; set; } = null!;
 
     // ===== TIPO DE SERVICIO =====
-    // Para agregar un nuevo módulo de servicio:
-    //   1. Agrega el valor aquí (ej: "lavadora")
-    //   2. En el frontend: ModuleSelector.jsx > array MODULES
-    //   3. En el frontend: InformeEditor.jsx > objeto SLOTS_POR_TIPO
-    // Valores actuales: "washtower" | "refrigerador"
+    // Los tipos válidos son DINÁMICOS: cada uno se define en un archivo
+    // Templates/config/{tipo}.json (ver Services/TemplateConfigService.cs).
+    // Para agregar un módulo nuevo NO se toca código, solo se agrega el JSON
+    // (y la plantilla .xlsx). Tipos actuales: washtower, refrigerador, wm,
+    // dryer, estufas, rac, tv.
     [MaxLength(30)] public string TipoServicio { get; set; } = "washtower";
 
     // --- Datos del Taller ---
@@ -62,8 +62,9 @@ public class Foto
     public int InformeId { get; set; }
     public Informe Informe { get; set; } = null!;
 
-    // Slots para WashTower: serie | accesorios | presion | alimentacion | nivelacion | equipo
-    // Para agregar slots de un nuevo tipo de servicio, ver InformeService.cs > SlotsValidos
+    // El nombre del slot depende del tipo de servicio del informe. Los slots
+    // válidos de cada tipo se definen en Templates/config/{tipo}.json (campo
+    // "slots") y se validan vía ITemplateConfigService.SlotValido.
     [Required, MaxLength(30)] public string Slot { get; set; } = "";
     [Required, MaxLength(255)] public string NombreArchivo { get; set; } = "";
     [Required, MaxLength(500)] public string RutaRelativa { get; set; } = "";

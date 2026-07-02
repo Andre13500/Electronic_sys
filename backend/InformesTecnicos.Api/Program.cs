@@ -11,15 +11,32 @@ using System.Threading.RateLimiting;
 QuestPDF.Settings.License = LicenseType.Community;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Carga de secretos (clave JWT, cadena de conexión) desde un archivo NO versionado.
+// En producción también pueden venir de variables de entorno (Jwt__Key,
+// ConnectionStrings__conectionSql), que tienen prioridad sobre los archivos.
+builder.Configuration.AddJsonFile("appsettings.Secrets.json", optional: true, reloadOnChange: true);
+builder.Configuration.AddEnvironmentVariables();
+
 var cfg = builder.Configuration;
 
 // --- DB ---
 builder.Services.AddDbContext<AppDbContext>(opt =>
 {
     var provider = cfg["Database:Provider"] ?? "SqlServer";
-    var conn = cfg.GetConnectionString("Default")!;
+    var conn = cfg.GetConnectionString("conectionSql")!;
     if (provider.Equals("SqlServer", StringComparison.OrdinalIgnoreCase))
-        opt.UseSqlServer(conn);
+        // EnableRetryOnFailure: reintenta ante fallos transitorios de red hacia la BD
+        // remota (ej. databaseasp.net), en vez de tumbar la app al primer fallo.
+        opt.UseSqlServer(conn, sql =>
+        {
+            sql.EnableRetryOnFailure(
+                maxRetryCount: 3,
+                maxRetryDelay: TimeSpan.FromSeconds(5),
+                errorNumbersToAdd: null);
+            // Corta consultas colgadas a los 30s en vez de esperar indefinidamente.
+            sql.CommandTimeout(30);
+        });
     else
         opt.UseSqlite(conn);
 });
@@ -28,6 +45,8 @@ builder.Services.AddDbContext<AppDbContext>(opt =>
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IAdminService, AdminService>();
 builder.Services.AddScoped<IInformeService, InformeService>();
+// Configuración de plantillas (Templates/config/*.json). Singleton: se carga una vez al iniciar.
+builder.Services.AddSingleton<ITemplateConfigService, TemplateConfigService>();
 builder.Services.AddScoped<IExcelExportService, ExcelExportService>();
 builder.Services.AddScoped<IPdfExportService, PdfExportService>();
 
@@ -85,11 +104,9 @@ builder.Services.AddRateLimiter(rl =>
     };
 });
 
-// --- CORS (orígenes configurables) ---
-var allowedOrigins = cfg.GetSection("Cors:AllowedOrigins").Get<string[]>()
-    ?? ["http://localhost:5173"];
+// --- CORS ---
 builder.Services.AddCors(o => o.AddPolicy("Front", p => p
-    .WithOrigins(allowedOrigins)
+    .AllowAnyOrigin()
     .AllowAnyHeader()
     .AllowAnyMethod()));
 
@@ -104,32 +121,39 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(o =>
 var app = builder.Build();
 
 // --- Inicialización DB ---
-using (var scope = app.Services.CreateScope())
+try
 {
-    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    db.Database.EnsureCreated();
-
-    var isSqlite = db.Database.ProviderName?.Contains("Sqlite", StringComparison.OrdinalIgnoreCase) == true;
-    if (isSqlite)
+    using (var scope = app.Services.CreateScope())
     {
-        try { db.Database.ExecuteSqlRaw("ALTER TABLE Usuarios ADD COLUMN MustChangePassword INTEGER NOT NULL DEFAULT 0"); } catch { }
-        try { db.Database.ExecuteSqlRaw("ALTER TABLE Informes ADD COLUMN TipoServicio TEXT NOT NULL DEFAULT 'washtower'"); } catch { }
-        try { db.Database.ExecuteSqlRaw("ALTER TABLE Informes ADD COLUMN FormaPago TEXT NULL"); } catch { }
-    }
-    else
-    {
-        try { db.Database.ExecuteSqlRaw(@"
-            IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID('Usuarios') AND name='MustChangePassword')
-                ALTER TABLE Usuarios ADD MustChangePassword bit NOT NULL DEFAULT 0"); } catch { }
-        try { db.Database.ExecuteSqlRaw(@"
-            IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID('Informes') AND name='TipoServicio')
-                ALTER TABLE Informes ADD TipoServicio nvarchar(30) NOT NULL DEFAULT 'washtower'"); } catch { }
-        try { db.Database.ExecuteSqlRaw(@"
-            IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID('Informes') AND name='FormaPago')
-                ALTER TABLE Informes ADD FormaPago nvarchar(30) NULL"); } catch { }
-    }
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        db.Database.EnsureCreated();
 
-    DbSeeder.Seed(db);
+        var isSqlite = db.Database.ProviderName?.Contains("Sqlite", StringComparison.OrdinalIgnoreCase) == true;
+        if (isSqlite)
+        {
+            try { db.Database.ExecuteSqlRaw("ALTER TABLE Usuarios ADD COLUMN MustChangePassword INTEGER NOT NULL DEFAULT 0"); } catch { }
+            try { db.Database.ExecuteSqlRaw("ALTER TABLE Informes ADD COLUMN TipoServicio TEXT NOT NULL DEFAULT 'washtower'"); } catch { }
+            try { db.Database.ExecuteSqlRaw("ALTER TABLE Informes ADD COLUMN FormaPago TEXT NULL"); } catch { }
+        }
+        else
+        {
+            try { db.Database.ExecuteSqlRaw(@"
+                IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID('Usuarios') AND name='MustChangePassword')
+                    ALTER TABLE Usuarios ADD MustChangePassword bit NOT NULL DEFAULT 0"); } catch { }
+            try { db.Database.ExecuteSqlRaw(@"
+                IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID('Informes') AND name='TipoServicio')
+                    ALTER TABLE Informes ADD TipoServicio nvarchar(30) NOT NULL DEFAULT 'washtower'"); } catch { }
+            try { db.Database.ExecuteSqlRaw(@"
+                IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID('Informes') AND name='FormaPago')
+                    ALTER TABLE Informes ADD FormaPago nvarchar(30) NULL"); } catch { }
+        }
+
+        DbSeeder.Seed(db);
+    }
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"[STARTUP ERROR] Fallo al inicializar la BD: {ex.Message}");
 }
 
 // --- Headers de seguridad ---
@@ -146,23 +170,22 @@ app.Use(async (ctx, next) =>
     await next();
 });
 
-if (!app.Environment.IsDevelopment())
-    app.UseHttpsRedirection();
 
-app.UseSwagger();
-app.UseSwaggerUI();
+// Swagger: siempre en desarrollo; en producción solo si "Swagger:Enabled" = true.
+// Para OCULTARLO en producción, pon "Swagger": { "Enabled": false } en appsettings.
+if (app.Environment.IsDevelopment() || app.Configuration.GetValue("Swagger:Enabled", false))
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
 
 app.UseCors("Front");
 app.UseRateLimiter();
 
-// Servir uploads
+// Carpeta de subidas (solo se crea; las fotos NO se sirven de forma pública).
+// El acceso a las imágenes es autenticado vía GET /api/informes/{id}/fotos/{fotoId}/imagen.
 var uploads = Path.Combine(app.Environment.ContentRootPath, "uploads");
 Directory.CreateDirectory(uploads);
-app.UseStaticFiles(new StaticFileOptions
-{
-    FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(uploads),
-    RequestPath = "/uploads"
-});
 
 app.UseAuthentication();
 app.UseAuthorization();

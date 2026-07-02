@@ -1,0 +1,25 @@
+{
+  "tipo": "tv",
+  "label": "Televisor (TV)",
+  "descripcion": "Instalación de TV LG",
+  "icono": "📺",
+  "imagen": "tv.jpg",
+  "plantilla": "Informe de instalacion - TV.xlsx",
+  "campos": {
+    "TallerNombre": "C7",
+    "TecnicoResponsable": "L7",
+    "OrdenServicio": "C14",
+    "NumeroSerie": "I23",
+    "ClienteNombre": "C16",
+    "LugarInstalacion": "C18",
+    "ModeloProducto": "C23"
+  },
+  "slots": [
+    { "key": "serial_tv",     "label": "Etiqueta del Serial del Producto",              "anchor": [2,  38, 7,  48] },
+    { "key": "caja_tv",       "label": "Foto de la caja (embalaje) del TV",             "anchor": [8,  38, 13, 48] },
+    { "key": "accesorios_tv", "label": "Accesorios",                                    "anchor": [14, 38, 19, 48] },
+    { "key": "lugar_antes",   "label": "Lugar antes de la Instalación",                 "anchor": [2,  51, 7,  61] },
+    { "key": "soporte_tv",    "label": "Foto del soporte instalado en el sitio",        "anchor": [8,  51, 13, 61] },
+    { "key": "lugar_luego",   "label": "Lugar luego de la Instalación (Foto frontal)",  "anchor": [14, 51, 19, 61] }
+  ]
+}

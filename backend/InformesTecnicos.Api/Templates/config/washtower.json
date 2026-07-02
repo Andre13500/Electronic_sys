@@ -1,0 +1,25 @@
+{
+  "tipo": "washtower",
+  "label": "WashTower",
+  "descripcion": "Lavadora Torre LG",
+  "icono": "🗼",
+  "imagen": "washtower.jpg",
+  "plantilla": "WashTower_Template.xlsx",
+  "campos": {
+    "TallerNombre": "B10",
+    "TecnicoResponsable": "H10",
+    "OrdenServicio": "B16",
+    "NumeroSerie": "I16",
+    "ClienteNombre": "B18",
+    "LugarInstalacion": "B20",
+    "ModeloProducto": "B22"
+  },
+  "slots": [
+    { "key": "serie",        "label": "Nº Serie",                                  "anchor": [1,  37, 5,  46] },
+    { "key": "accesorios",   "label": "Accesorios (Manguera + Llave)",             "anchor": [6,  37, 10, 46] },
+    { "key": "presion",      "label": "Presión de Agua (0,5 ~ 8,0 kgf/cm²)",       "anchor": [11, 37, 15, 46] },
+    { "key": "alimentacion", "label": "Alimentación Eléctrica (220 V)",            "anchor": [1,  54, 5,  63] },
+    { "key": "nivelacion",   "label": "Nivelación",                                "anchor": [6,  54, 10, 63] },
+    { "key": "equipo",       "label": "Foto del Equipo Instalado",                 "anchor": [11, 54, 15, 63] }
+  ]
+}

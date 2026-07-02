@@ -1,0 +1,28 @@
+{
+  "tipo": "dryer",
+  "label": "Secadora (DRYER)",
+  "descripcion": "Secadora LG (Gas / Eléctrica)",
+  "icono": "♨️",
+  "imagen": "secadora.jpg",
+  "plantilla": "Informe de instalacion - DRYER.xlsx",
+  "campos": {
+    "TallerNombre": "B10",
+    "TecnicoResponsable": "H10",
+    "OrdenServicio": "B16",
+    "NumeroSerie": "I16",
+    "ClienteNombre": "B18",
+    "LugarInstalacion": "B20",
+    "ModeloProducto": "B22"
+  },
+  "slots": [
+    { "key": "serie",        "label": "Nº Serie",                                      "anchor": [1,  31, 5,  40] },
+    { "key": "ventilacion",  "label": "Ventilación de extracción",                     "anchor": [6,  31, 10, 40] },
+    { "key": "accesorios",   "label": "Accesorios",                                    "anchor": [11, 31, 15, 40] },
+    { "key": "ubicacion",    "label": "Ubicación",                                     "anchor": [1,  44, 5,  53] },
+    { "key": "nivelacion",   "label": "Nivelación",                                    "anchor": [6,  44, 10, 53] },
+    { "key": "ducto",        "label": "Ducto de desfogue",                             "anchor": [11, 44, 15, 53] },
+    { "key": "alimentacion", "label": "Alimentación eléctrica",                        "anchor": [1,  56, 5,  65] },
+    { "key": "conexion",     "label": "Conexión de cable / Instalación de regulador",  "anchor": [6,  56, 10, 65] },
+    { "key": "corte",        "label": "Sistema de corte o protección eléctrica",       "anchor": [11, 56, 15, 65] }
+  ]
+}

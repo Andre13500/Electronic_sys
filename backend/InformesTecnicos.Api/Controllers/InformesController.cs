@@ -16,12 +16,27 @@ public class InformesController : ControllerBase
     private readonly IExcelExportService _excel;
     private readonly IPdfExportService _pdf;
     private readonly IWebHostEnvironment _env;
+    private readonly ITemplateConfigService _config;
 
-    public InformesController(IInformeService svc, IExcelExportService excel, IPdfExportService pdf, IWebHostEnvironment env)
-    { _svc = svc; _excel = excel; _pdf = pdf; _env = env; }
+    public InformesController(IInformeService svc, IExcelExportService excel, IPdfExportService pdf,
+        IWebHostEnvironment env, ITemplateConfigService config)
+    { _svc = svc; _excel = excel; _pdf = pdf; _env = env; _config = config; }
 
     private int UsuarioId => int.Parse(User.FindFirstValue(JwtRegisteredClaimNames.Sub) ?? "0");
     private string Rol    => User.FindFirstValue(ClaimTypes.Role) ?? "Tecnico";
+
+    // Lista los módulos de servicio disponibles y sus fotos (slots), derivados de
+    // las configuraciones Templates/config/*.json. El frontend construye con esto
+    // el selector de módulos y las cuadrículas de fotos, sin listas hardcodeadas.
+    [HttpGet("modulos")]
+    public IActionResult Modulos()
+    {
+        var modulos = _config.Todas.Select(c => new ModuloDto(
+            c.Tipo, c.Label, c.Descripcion, c.Icono, c.Imagen,
+            c.Slots.Select(s => new SlotDto(s.Key, s.Label)).ToList()
+        )).ToList();
+        return Ok(modulos);
+    }
 
     [HttpGet]
     public async Task<IActionResult> Listar([FromQuery] string? q)
@@ -88,11 +103,41 @@ public class InformesController : ControllerBase
         catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
     }
 
+    // Sirve una foto de forma AUTENTICADA (reemplaza el acceso público a /uploads).
+    // Un Técnico solo ve fotos de sus informes; un Admin, cualquiera.
+    [HttpGet("{id:int}/fotos/{fotoId:int}/imagen")]
+    public async Task<IActionResult> VerFoto(int id, int fotoId)
+    {
+        try
+        {
+            var r = await _svc.ObtenerFotoArchivoAsync(id, fotoId, UsuarioId, Rol == "Admin", _env);
+            if (r is null) return NotFound();
+            // Caché privada en el navegador: evita re-descargar la misma foto en cada vista.
+            Response.Headers.CacheControl = "private, max-age=86400";
+            return PhysicalFile(r.Value.fullPath, r.Value.contentType);
+        }
+        catch (UnauthorizedAccessException ex) { return StatusCode(403, new { error = ex.Message }); }
+    }
+
     [HttpPost("{id:int}/finalizar")]
     public async Task<IActionResult> Finalizar(int id)
     {
         try { return Ok(await _svc.FinalizarAsync(id)); }
         catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    // Elimina un informe. SOLO el Admin puede eliminar (los técnicos no).
+    [HttpDelete("{id:int}")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> Eliminar(int id)
+    {
+        try
+        {
+            await _svc.EliminarAsync(id, UsuarioId, esAdmin: true, _env);
+            return NoContent();
+        }
+        catch (UnauthorizedAccessException ex) { return StatusCode(403, new { error = ex.Message }); }
+        catch (InvalidOperationException ex) { return NotFound(new { error = ex.Message }); }
     }
 
     [HttpGet("{id:int}/exportar/excel")]
