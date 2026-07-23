@@ -39,11 +39,12 @@ public class InformesController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> Listar([FromQuery] string? q)
+    public async Task<IActionResult> Listar([FromQuery] string? q, [FromQuery] bool eliminados = false)
     {
         // Técnico solo ve los suyos; Admin ve todos.
         int? tecnicoId = Rol == "Tecnico" ? UsuarioId : null;
-        return Ok(await _svc.ListarAsync(tecnicoId, q));
+        // eliminados=true devuelve la papelera (informes con soft delete).
+        return Ok(await _svc.ListarAsync(tecnicoId, q, soloEliminados: eliminados));
     }
 
     [HttpGet("{id:int}")]
@@ -126,7 +127,8 @@ public class InformesController : ControllerBase
         catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
     }
 
-    // Elimina un informe. SOLO el Admin puede eliminar (los técnicos no).
+    // Archiva un informe (borrado LÓGICO: no se borra de la BD, se oculta de la
+    // lista y se puede restaurar). SOLO el Admin puede eliminar (los técnicos no).
     [HttpDelete("{id:int}")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Eliminar(int id)
@@ -134,6 +136,20 @@ public class InformesController : ControllerBase
         try
         {
             await _svc.EliminarAsync(id, UsuarioId, esAdmin: true, _env);
+            return NoContent();
+        }
+        catch (UnauthorizedAccessException ex) { return StatusCode(403, new { error = ex.Message }); }
+        catch (InvalidOperationException ex) { return NotFound(new { error = ex.Message }); }
+    }
+
+    // Restaura un informe archivado (lo saca de la papelera). SOLO el Admin.
+    [HttpPost("{id:int}/restaurar")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> Restaurar(int id)
+    {
+        try
+        {
+            await _svc.RestaurarAsync(id, UsuarioId, esAdmin: true);
             return NoContent();
         }
         catch (UnauthorizedAccessException ex) { return StatusCode(403, new { error = ex.Message }); }

@@ -134,6 +134,8 @@ try
             try { db.Database.ExecuteSqlRaw("ALTER TABLE Usuarios ADD COLUMN MustChangePassword INTEGER NOT NULL DEFAULT 0"); } catch { }
             try { db.Database.ExecuteSqlRaw("ALTER TABLE Informes ADD COLUMN TipoServicio TEXT NOT NULL DEFAULT 'washtower'"); } catch { }
             try { db.Database.ExecuteSqlRaw("ALTER TABLE Informes ADD COLUMN FormaPago TEXT NULL"); } catch { }
+            try { db.Database.ExecuteSqlRaw("ALTER TABLE Informes ADD COLUMN Eliminado INTEGER NOT NULL DEFAULT 0"); } catch { }
+            try { db.Database.ExecuteSqlRaw("ALTER TABLE Informes ADD COLUMN EliminadoEn TEXT NULL"); } catch { }
         }
         else
         {
@@ -146,6 +148,12 @@ try
             try { db.Database.ExecuteSqlRaw(@"
                 IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID('Informes') AND name='FormaPago')
                     ALTER TABLE Informes ADD FormaPago nvarchar(30) NULL"); } catch { }
+            try { db.Database.ExecuteSqlRaw(@"
+                IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID('Informes') AND name='Eliminado')
+                    ALTER TABLE Informes ADD Eliminado bit NOT NULL DEFAULT 0"); } catch { }
+            try { db.Database.ExecuteSqlRaw(@"
+                IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID('Informes') AND name='EliminadoEn')
+                    ALTER TABLE Informes ADD EliminadoEn datetime2 NULL"); } catch { }
         }
 
         DbSeeder.Seed(db);

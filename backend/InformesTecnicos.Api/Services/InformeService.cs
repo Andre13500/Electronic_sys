@@ -9,12 +9,13 @@ public interface IInformeService
 {
     Task<InformeDto> CrearAsync(int tecnicoId, string tipoServicio);
     Task<InformeDto?> ObtenerAsync(int id);
-    Task<List<InformeListDto>> ListarAsync(int? tecnicoId, string? q);
+    Task<List<InformeListDto>> ListarAsync(int? tecnicoId, string? q, bool soloEliminados = false);
     Task<InformeDto> GuardarAsync(int id, GuardarInformeRequest req);
     Task<FotoDto> SubirFotoAsync(int id, string slot, IFormFile archivo, IWebHostEnvironment env);
     Task EliminarFotoAsync(int id, int fotoId, IWebHostEnvironment env);
     Task<InformeDto> FinalizarAsync(int id);
     Task EliminarAsync(int id, int solicitanteId, bool esAdmin, IWebHostEnvironment env);
+    Task RestaurarAsync(int id, int solicitanteId, bool esAdmin);
     Task<(string fullPath, string contentType)?> ObtenerFotoArchivoAsync(
         int informeId, int fotoId, int solicitanteId, bool esAdmin, IWebHostEnvironment env);
 }
@@ -69,9 +70,11 @@ public class InformeService : IInformeService
         return ToDto(i);
     }
 
-    public async Task<List<InformeListDto>> ListarAsync(int? tecnicoId, string? q)
+    public async Task<List<InformeListDto>> ListarAsync(int? tecnicoId, string? q, bool soloEliminados = false)
     {
         var query = _db.Informes.Include(i => i.Tecnico).AsQueryable();
+        // Soft delete: por defecto solo informes activos; soloEliminados=true = papelera.
+        query = query.Where(i => i.Eliminado == soloEliminados);
         if (tecnicoId.HasValue) query = query.Where(i => i.TecnicoId == tecnicoId.Value);
         if (!string.IsNullOrWhiteSpace(q))
         {
@@ -163,29 +166,38 @@ public class InformeService : IInformeService
         return (await ObtenerAsync(id))!;
     }
 
-    // Elimina un informe con sus fotos (registros en BD y archivos en disco).
+    // Borrado LÓGICO (soft delete): el informe NO se elimina de la BD ni sus fotos
+    // del disco. Solo se marca como eliminado y se oculta de la lista (ListarAsync
+    // filtra Eliminado). Se puede deshacer con RestaurarAsync.
+    // El parámetro env se conserva por compatibilidad de firma (ya no se usa archivos).
     // Autorización: un Técnico solo puede eliminar SUS informes; un Admin, cualquiera.
     public async Task EliminarAsync(int id, int solicitanteId, bool esAdmin, IWebHostEnvironment env)
     {
-        var informe = await _db.Informes.Include(i => i.Fotos).FirstOrDefaultAsync(i => i.Id == id)
+        var informe = await _db.Informes.FirstOrDefaultAsync(i => i.Id == id)
             ?? throw new InvalidOperationException("Informe no encontrado.");
 
         if (!esAdmin && informe.TecnicoId != solicitanteId)
             throw new UnauthorizedAccessException("No tienes permiso para eliminar este informe.");
 
-        // Borrar los archivos físicos de las fotos y la carpeta del informe
-        foreach (var f in informe.Fotos)
-            EliminarArchivo(env, f.RutaRelativa);
-        try
-        {
-            var dir = Path.Combine(env.ContentRootPath, "uploads", id.ToString());
-            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
-        }
-        catch { }
+        informe.Eliminado = true;
+        informe.EliminadoEn = DateTime.UtcNow;
+        informe.ActualizadoEn = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+    }
 
-        // Borrar las fotos y el informe de la base de datos
-        _db.Fotos.RemoveRange(informe.Fotos);
-        _db.Informes.Remove(informe);
+    // Restaura un informe previamente marcado como eliminado (lo saca de la papelera).
+    // Autorización: un Técnico solo los suyos; un Admin, cualquiera.
+    public async Task RestaurarAsync(int id, int solicitanteId, bool esAdmin)
+    {
+        var informe = await _db.Informes.FirstOrDefaultAsync(i => i.Id == id)
+            ?? throw new InvalidOperationException("Informe no encontrado.");
+
+        if (!esAdmin && informe.TecnicoId != solicitanteId)
+            throw new UnauthorizedAccessException("No tienes permiso para restaurar este informe.");
+
+        informe.Eliminado = false;
+        informe.EliminadoEn = null;
+        informe.ActualizadoEn = DateTime.UtcNow;
         await _db.SaveChangesAsync();
     }
 

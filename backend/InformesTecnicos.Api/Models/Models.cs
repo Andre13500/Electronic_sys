@@ -53,6 +53,13 @@ public class Informe
     public DateTime CreadoEn { get; set; } = DateTime.UtcNow;
     public DateTime ActualizadoEn { get; set; } = DateTime.UtcNow;
 
+    // ===== BORRADO LÓGICO (soft delete) =====
+    // El informe NUNCA se elimina de la BD: se marca Eliminado=true y se oculta
+    // de la lista. Sus fotos (fila y archivos en disco) se conservan para poder
+    // restaurarlo. Ver InformeService.EliminarAsync / RestaurarAsync.
+    public bool Eliminado { get; set; } = false;
+    public DateTime? EliminadoEn { get; set; }
+
     public ICollection<Foto> Fotos { get; set; } = new List<Foto>();
 }
 

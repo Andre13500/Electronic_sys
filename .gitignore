@@ -1,54 +1,114 @@
-node_modules
+# =============================================================
+#  .gitignore — InformesTecnicos LG
+#  IMPORTANTE: estas reglas NO afectan a archivos que Git YA rastrea.
+#  Si un archivo sensible fue commiteado antes, hay que sacarlo con:
+#      git rm --cached <ruta>
+#  (y purgar el historial si ya se subió a un repo público).
+# =============================================================
 
-# .NET build output
+# -------- Dependencias --------
+node_modules
+frontend/node_modules/
+
+# -------- .NET: salida de compilación --------
 **/bin/
 **/obj/
 
-# Paquetes de publicación (no subir al repo — pueden contener secretos)
+# -------- Paquetes de publicación (CONTIENEN SECRETOS: appsettings con
+#          la cadena de conexión y la clave JWT ya resueltas) --------
 **/publish/
 **/publish_deploy/
+**/PubTmp/
+*.zip
 
-# Base de datos local (no subir al repo; en producción se crea en /data)
+# -------- Perfiles de publicación / despliegue --------
+# .pubxml lleva usuario y servidor del hosting; .pubxml.user lleva la contraseña cifrada.
+**/PublishProfiles/
+*.pubxml
+*.pubxml.user
+
+# -------- Credenciales y secretos — NUNCA al repo --------
+# (la plantilla appsettings.Secrets.example.json SÍ se sube)
+appsettings.Secrets.json
+**/appsettings.Secrets.json
+**/appsettings.*.Secrets.json
+**/secrets.json
+*.pfx
+*.p12
+*.key
+*.pem
+credenciales*
+Credenciales*
+**/datas/
+
+# -------- Variables de entorno --------
+.env
+.env.*
+!.env.example
+# Excepción: solo contiene VITE_API_URL, que es público por diseño (Vite lo
+# incrusta en el bundle JS). Es necesario para el build de GitHub Pages.
+!frontend/.env.production
+*.env.bak
+*.bak
+
+# -------- Base de datos local --------
 *.db
 *.db-shm
 *.db-wal
+*.mdf
+*.ldf
+*.sqlite
+*.sqlite3
 
-# Fotos subidas localmente
+# -------- Datos de usuarios (fotos subidas, informes generados) --------
 backend/InformesTecnicos.Api/uploads/
+**/uploads/
+**/logs/
 
-# Variables de entorno locales
-.env
-.env.local
-
-# Credenciales / secretos — NUNCA subir al repo (la plantilla .example sí se sube)
-appsettings.Secrets.json
-**/appsettings.Secrets.json
-
-# Visual Studio / Rider workspace temp files
+# -------- Visual Studio / Rider / editores --------
 .vs/
 backend/.vs/
 *.user
 *.suo
+*.userprefs
 .idea/
+*.swp
 
-# Ejecutables e instaladores (nunca al repo)
+# -------- Config local de herramientas --------
+.claude/settings.local.json
+# Instrucciones internas para Claude Code. La documentación pública está en
+# README.md y GUIA-CAMBIOS.md. Para volver a versionarlo: git add -f CLAUDE.md
+CLAUDE.md
+
+# -------- Ejecutables e instaladores --------
 *.exe
 *.msi
+*.dll
+*.so
+*.dylib
 *.dmg
 *.pkg
 *.deb
 *.rpm
 *.appimage
 
-# Frontend build output
+# -------- Build del frontend --------
 frontend/dist/
 frontend/.vite/
 
-# OS files
+# -------- Archivos personales que no son del proyecto --------
+# Solo se versionan las imágenes de los módulos de servicio.
+frontend/img/*.pdf
+frontend/img/rostro*
+frontend/img/images.jpg
+frontend/img/Leo_Messi*
+
+# -------- Sistema operativo --------
 .DS_Store
 Thumbs.db
 desktop.ini
 
-# Logs
+# -------- Logs --------
 *.log
 npm-debug.log*
+yarn-error.log*

@@ -171,10 +171,10 @@ export default function InformesList() {
           </div>
           <button
             onClick={() => setMostrarLista(m => !m)}
-            className="btn-secondary shrink-0 whitespace-nowrap"
-            title={mostrarLista ? 'Ocultar la lista de informes' : 'Mostrar la lista de informes'}
+            className="btn-secondary shrink-0 whitespace-nowrap "
+            title={mostrarLista ? 'Ocultar informes' : 'Mostrar informes'}
           >
-            {mostrarLista ? '🙈 Ocultar' : '👁 Mostrar'}
+            {mostrarLista ? ' Ocultar' : ' Mostrar'}
           </button>
         </div>
 
@@ -264,9 +264,9 @@ export default function InformesList() {
             </div>
             <h3 className="font-semibold text-warm-ink">Eliminar informe</h3>
             <p className="text-sm text-warm-mute mt-1">
-              Se eliminará <span className="font-medium text-warm-ink">{confirmar.codigo}</span>
-              {confirmar.clienteNombre ? ` (${confirmar.clienteNombre})` : ''} y todas sus fotos.
-              Esta acción no se puede deshacer.
+              Se archivará <span className="font-medium text-warm-ink">{confirmar.codigo}</span>
+              {confirmar.clienteNombre ? ` (${confirmar.clienteNombre})` : ''} y dejará de aparecer en la lista.
+              No se elimina de la base de datos; un administrador puede restaurarlo después.
             </p>
             <div className="flex gap-3 mt-5">
               <button onClick={() => setConfirmar(null)} disabled={eliminando} className="btn-secondary flex-1">Cancelar</button>

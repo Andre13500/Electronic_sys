@@ -47,8 +47,8 @@ El frontend obtiene los módulos por **`GET /api/informes/modulos`** y los cache
 | Cómo se rellena un campo en Excel | `Services/ExcelExportService.cs` → `ValorCampo` |
 | Cómo se posiciona/embebe la foto en Excel | `Services/ExcelExportService.cs` → `BuildAnchor` / `EmbedPhotos` |
 | Carga/validación de configs | `Services/TemplateConfigService.cs` |
-| Crear/guardar/finalizar/eliminar informe | `Services/InformeService.cs` |
-| Endpoints de informes (crear, listar, exportar, eliminar, fotos, módulos) | `Controllers/InformesController.cs` |
+| Crear/guardar/finalizar/eliminar/restaurar informe | `Services/InformeService.cs` |
+| Endpoints de informes (crear, listar, exportar, eliminar, restaurar, papelera, fotos, módulos) | `Controllers/InformesController.cs` |
 | Auth (login, cambio pass, /me) | `Controllers/AuthController.cs` + `Services/AuthService.cs` |
 | Config de arranque (JWT, CORS, rate-limit, secretos, middleware) | `Program.cs` |
 | DTOs (request/response) | `DTOs/Dtos.cs` |
@@ -127,3 +127,11 @@ El frontend obtiene los módulos por **`GET /api/informes/modulos`** y los cache
 - Informe: código `INF-YYYY-#####`, estado `borrador|finalizado`, `TipoServicio` (fijo al crear), `FormaPago` (solo web, no se exporta).
 - `Usuario.Rol` = `Admin | Tecnico`. Admin ve todo; Técnico solo lo suyo.
 - `Foto.Slot` = key del slot (validado contra el config del tipo, `TemplateConfigService.SlotValido`).
+
+**Borrado lógico (soft delete):** `DELETE /api/informes/{id}` (solo Admin) **ya NO borra** la fila
+ni las fotos: marca `Informe.Eliminado = true` + `EliminadoEn` y lo oculta de la lista.
+- Restaurar: `POST /api/informes/{id}/restaurar` (solo Admin).
+- Ver papelera: `GET /api/informes?eliminados=true`.
+- Filtro en `InformeService.ListarAsync` (`soloEliminados`). Las columnas `Eliminado`/`EliminadoEn`
+  se agregan por `ALTER TABLE` en `Program.cs` (SQLite + SQL Server), como el resto.
+- Pendiente frontend: botón "Eliminar" hoy asume borrado real; falta vista de papelera + botón restaurar.
